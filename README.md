@@ -41,6 +41,23 @@ and transmission glitches. This package:
 - Produces static (matplotlib) and interactive (Plotly) visualizations.
 - Provides a complete Streamlit dashboard for end-to-end, no-code experimentation.
 
+### Paper-aligned experiment protocol
+
+- The missing-data generator can create MCAR missingness at any whole-number
+  percentage from 1% to 99% in the selected numeric column.
+- Full experiments test 1%, 3%, and 5%, then 10% increments from 10% through
+  90%, followed by the 99% stress test.
+- Each algorithm/scenario is run eight times with independently generated,
+  reproducible missing-value samples. The same seed sequence is used across
+  algorithms so their runs use matching missing-value samples.
+- The dashboard and headless benchmark report mean MAE, RMSE, Relative Error,
+  MAPE, and execution time across successful repetitions. Exported results
+  include `n_runs`, the number of successful repetitions behind each row; if a
+  rate cannot be generated for a small dataset or an imputation run fails, that
+  run is skipped and reported rather than counted as successful.
+- The paper's 99% performance result applies to its Makima experiments; it is
+  not a guarantee of accuracy for other algorithms or user-provided datasets.
+
 ---
 
 ## Installation
@@ -72,9 +89,9 @@ Then, in the browser:
 2. **⚡ Missing Data Generator** — choose a missing-data percentage and generate
    MCAR gaps.
 3. **🧠 Imputation Algorithms** — select and run one or more algorithms.
-4. **📊 Experiment Results** — view the comparison table, or click
-   **🚀 Run All Experiments** to benchmark all seven techniques across the
-   standard scenarios plus the 99% stress test, with eight runs per scenario.
+4. **📊 Experiment Results** — view mean metrics and successful run counts, or
+   click **🚀 Run All Experiments** to benchmark all seven techniques across
+   the standard scenarios plus the 99% stress test, with eight runs per scenario.
 5. **📈 Visualizations** — explore original-vs-imputed signals, error curves,
    runtime, and metric comparisons; export figures as a ZIP.
 6. **📑 Literature Summary** / **ℹ️ About** — background on the source paper and
