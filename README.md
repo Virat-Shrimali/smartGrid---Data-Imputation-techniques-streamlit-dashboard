@@ -35,7 +35,9 @@ and transmission glitches. This package:
   increments from 10% through 90%, followed by the 99% stress test.
 - Runs seven imputation algorithms — Median, LOCF, KNN, Makima, PCHIP, MICE,
   and MissForest — each inheriting a common abstract base class.
-- Computes MAE, RMSE, Relative Error, MAPE, and execution time for every run.
+- Repeats each algorithm/scenario eight times with independently generated
+  missing-value samples, and reports metrics averaged across successful runs.
+- Computes MAE, RMSE, Relative Error, MAPE, and mean execution time.
 - Produces static (matplotlib) and interactive (Plotly) visualizations.
 - Provides a complete Streamlit dashboard for end-to-end, no-code experimentation.
 
@@ -72,7 +74,7 @@ Then, in the browser:
 3. **🧠 Imputation Algorithms** — select and run one or more algorithms.
 4. **📊 Experiment Results** — view the comparison table, or click
    **🚀 Run All Experiments** to benchmark all seven techniques across the
-   standard scenarios plus the 99% stress test in one click.
+   standard scenarios plus the 99% stress test, with eight runs per scenario.
 5. **📈 Visualizations** — explore original-vs-imputed signals, error curves,
    runtime, and metric comparisons; export figures as a ZIP.
 6. **📑 Literature Summary** / **ℹ️ About** — background on the source paper and
@@ -85,7 +87,8 @@ python main.py --data data/example_smart_grid.csv --column primary_current_a
 ```
 
 This runs the full experiment pipeline (all seven techniques × 13 missing
-rates), writes `results/results.csv`, and saves all figures to `figures/`.
+rates × eight runs), writes averaged results and successful run counts to
+`results/results.csv`, and saves all figures to `figures/`.
 
 ### Running tests
 

@@ -37,6 +37,8 @@ class MetricsResult:
         Wall-clock runtime of the imputation algorithm.
     n_points:
         Number of imputed points the metrics were computed over.
+    n_runs:
+        Number of successful repetitions represented by the averaged metrics.
     """
 
     technique: str
@@ -47,6 +49,7 @@ class MetricsResult:
     mape: float
     execution_time_seconds: float
     n_points: int
+    n_runs: int = 1
 
     def to_dict(self) -> dict:
         """Convert this result into a flat dictionary (for CSV export)."""
@@ -59,6 +62,7 @@ class MetricsResult:
             "mape": self.mape,
             "execution_time_seconds": self.execution_time_seconds,
             "n_points": self.n_points,
+            "n_runs": self.n_runs,
         }
 
 
@@ -178,6 +182,7 @@ class MetricsCalculator:
                     "mape",
                     "execution_time_seconds",
                     "n_points",
+                    "n_runs",
                 ]
             )
         return pd.DataFrame([r.to_dict() for r in results])

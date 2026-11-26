@@ -118,3 +118,5 @@ DEFAULT_MISSING_RATES: tuple[float, ...] = (
     0.90,
     0.99,
 )
+
+PAPER_RUN_REPEATS: int = 8
