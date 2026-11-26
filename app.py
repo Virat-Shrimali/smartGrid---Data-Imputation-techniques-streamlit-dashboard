@@ -18,7 +18,12 @@ import pandas as pd
 import streamlit as st
 
 from src.data_loader import DataLoader
-from src.experiment_runner import ExperimentRunner, IMPUTER_REGISTRY, get_imputer
+from src.experiment_runner import (
+    ExperimentRunner,
+    IMPUTER_REGISTRY,
+    get_imputer,
+    run_repeated_imputation,
+)
 from src.metrics import MetricsCalculator
 from src.missing_generator import MissingGenerator
 from src.plotly_visuals import (
@@ -29,7 +34,12 @@ from src.plotly_visuals import (
     plot_original_vs_imputed,
     plot_runtime_comparison,
 )
-from src.utils import DEFAULT_MISSING_RATES, SmartGridImputationError, ensure_directory
+from src.utils import (
+    DEFAULT_MISSING_RATES,
+    PAPER_RUN_REPEATS,
+    SmartGridImputationError,
+    ensure_directory,
+)
 
 # --------------------------------------------------------------------------- #
 # Page configuration & styling
@@ -214,6 +224,7 @@ def render_home() -> None:
             """
             - Reproduce Median, LOCF, KNN, and Makima imputation as production-quality code.
             - Benchmark each technique across standard MCAR rates and a 99% stress test.
+            - Repeat each technique/scenario eight times and average the results.
             - Quantify accuracy (MAE, RMSE, Relative Error, MAPE) and runtime.
             - Provide an interactive tool to upload any CSV time series and repeat the study.
             """
@@ -410,7 +421,11 @@ def render_imputation() -> None:
         st.warning("Generate missing values on the **⚡ Missing Data Generator** page first.")
         return
 
-    st.write("Select one or more algorithms to run against the current missing-data scenario.")
+    st.write(
+        f"Select algorithms to run against the current scenario. Each algorithm "
+        f"uses {PAPER_RUN_REPEATS} independent missing-value samples; displayed "
+        "metrics are averaged across successful runs."
+    )
 
     algorithm_names = list(IMPUTER_REGISTRY.keys())
     n_cols = min(4, len(algorithm_names)) or 1
@@ -424,9 +439,7 @@ def render_imputation() -> None:
     run_clicked = st.button("▶️ Run Selected Algorithms", type="primary", disabled=not selected)
 
     if run_clicked:
-        series_missing = st.session_state.series_with_missing
         ground_truth = st.session_state.ground_truth
-        removed_indices = st.session_state.removed_indices
         missing_pct = st.session_state.missing_pct
 
         progress = st.progress(0.0, text="Starting...")
@@ -434,21 +447,24 @@ def render_imputation() -> None:
         metrics_rows = []
 
         for i, name in enumerate(selected, start=1):
-            progress.progress((i - 1) / len(selected), text=f"Running {name}...")
+            progress.progress(
+                (i - 1) / len(selected),
+                text=f"Running {name} ({PAPER_RUN_REPEATS} repetitions)...",
+            )
             try:
                 imputer = get_imputer(name)
-                outcome = imputer.impute(series_missing)
-                metrics_result = MetricsCalculator.evaluate(
-                    technique=name,
-                    missing_pct=missing_pct,
-                    imputed_series=outcome.imputed_series,
+                metrics_result, outcome, _ = run_repeated_imputation(
+                    imputer=imputer,
                     ground_truth=ground_truth,
-                    removed_indices=removed_indices,
-                    execution_time_seconds=outcome.execution_time_seconds,
+                    missing_pct=missing_pct,
                 )
                 results[name] = outcome
                 metrics_rows.append(metrics_result)
-                st.toast(f"{name} completed in {outcome.execution_time_seconds:.4f}s", icon="✅")
+                st.toast(
+                    f"{name}: {metrics_result.n_runs}/{PAPER_RUN_REPEATS} runs; "
+                    f"mean runtime {metrics_result.execution_time_seconds:.4f}s",
+                    icon="✅",
+                )
             except SmartGridImputationError as exc:
                 st.error(f"{name} failed: {exc}")
             progress.progress(i / len(selected), text=f"{name} done")
@@ -457,6 +473,8 @@ def render_imputation() -> None:
         st.session_state.imputation_results = results
         st.session_state.results_df = MetricsCalculator.results_to_dataframe(metrics_rows)
         st.success(f"Completed {len(results)}/{len(selected)} algorithm(s).")
+        if any(result.n_runs < PAPER_RUN_REPEATS for result in metrics_rows):
+            st.warning("Some algorithm repetitions failed; metrics average successful runs only.")
 
     if st.session_state.imputation_results:
         st.divider()
@@ -492,7 +510,9 @@ def render_results() -> None:
         temp_csv = DATA_DIR / "_current_dataset.csv"
         st.session_state.dataframe.to_csv(temp_csv, index=False)
 
-        with st.spinner("Running full experiment across all scenarios..."):
+        with st.spinner(
+            f"Running {PAPER_RUN_REPEATS} repetitions per algorithm across all scenarios..."
+        ):
             runner = ExperimentRunner(
                 data_path=temp_csv,
                 target_column=st.session_state.target_column,
@@ -502,14 +522,17 @@ def render_results() -> None:
             full_results_df = runner.run(generate_plots=True)
         st.session_state.results_df = full_results_df
         expected_combinations = len(IMPUTER_REGISTRY) * len(DEFAULT_MISSING_RATES)
+        expected_runs = expected_combinations * PAPER_RUN_REPEATS
+        completed_runs = int(full_results_df["n_runs"].sum()) if not full_results_df.empty else 0
         st.success(
             f"Full experiment complete — {len(full_results_df)} successful "
-            "technique×scenario combinations evaluated."
+            f"technique×scenario combinations; {completed_runs}/{expected_runs} "
+            "repetitions completed."
         )
-        if len(full_results_df) < expected_combinations:
+        if len(full_results_df) < expected_combinations or completed_runs < expected_runs:
             st.warning(
-                "Some combinations were skipped because the dataset was too small for "
-                "a missingness rate or an algorithm could not complete the imputation."
+                "Some scenarios were not generatable for this dataset, or individual "
+                "imputation repetitions failed. Reported metrics average successful runs."
             )
 
     st.divider()

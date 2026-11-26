@@ -87,6 +87,7 @@ def test_results_to_dataframe_columns():
         "mape",
         "execution_time_seconds",
         "n_points",
+        "n_runs",
     }
     assert expected_cols.issubset(set(df.columns))
     assert len(df) == 1

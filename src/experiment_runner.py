@@ -7,13 +7,15 @@ result persistence into a single reproducible workflow.
 
 from __future__ import annotations
 
+from copy import deepcopy
 from dataclasses import dataclass, field
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 from src.data_loader import DataLoader
-from src.imputer_base import BaseImputer
+from src.imputer_base import BaseImputer, ImputationResult
 from src.knn_imputer import KNNImputer
 from src.locf_imputer import LOCFImputer
 from src.makima_imputer import MakimaImputer
@@ -27,6 +29,7 @@ from src.utils import (
     DEFAULT_MISSING_RATES,
     ImputationError,
     InvalidMissingRateError,
+    PAPER_RUN_REPEATS,
     ensure_directory,
     get_logger,
 )
@@ -84,6 +87,80 @@ def get_imputer(name: str) -> BaseImputer:
     return IMPUTER_REGISTRY[name]()
 
 
+def run_repeated_imputation(
+    imputer: BaseImputer,
+    ground_truth: pd.Series,
+    missing_pct: float,
+    random_state: int = 42,
+) -> tuple[MetricsResult, ImputationResult, np.ndarray]:
+    """Run one imputer on eight independently generated MCAR masks.
+
+    Returns the mean metrics across successful runs and the first imputed
+    series for visualization. Each repetition uses the same seed sequence
+    across algorithms so their results remain paired.
+    """
+    metrics_runs: list[MetricsResult] = []
+    first_outcome: ImputationResult | None = None
+    first_removed_indices: np.ndarray | None = None
+
+    for repetition in range(PAPER_RUN_REPEATS):
+        generator = MissingGenerator(random_state=random_state + repetition)
+        series_with_missing, truth, removed_indices = generator.generate(
+            ground_truth, missing_pct
+        )
+        try:
+            outcome = deepcopy(imputer).impute(series_with_missing)
+        except ImputationError as exc:
+            logger.warning(
+                "%s failed at %.0f%% missingness, repetition %d/%d: %s",
+                imputer.name,
+                missing_pct * 100,
+                repetition + 1,
+                PAPER_RUN_REPEATS,
+                exc,
+            )
+            continue
+
+        if first_outcome is None:
+            first_outcome = outcome
+            first_removed_indices = removed_indices
+        metrics_runs.append(
+            MetricsCalculator.evaluate(
+                technique=outcome.technique_name,
+                missing_pct=missing_pct,
+                imputed_series=outcome.imputed_series,
+                ground_truth=truth,
+                removed_indices=removed_indices,
+                execution_time_seconds=outcome.execution_time_seconds,
+            )
+        )
+
+    if not metrics_runs or first_outcome is None or first_removed_indices is None:
+        raise ImputationError(
+            f"[{imputer.name}] All {PAPER_RUN_REPEATS} repetitions failed at "
+            f"{missing_pct * 100:.0f}% missingness."
+        )
+
+    means = pd.DataFrame([result.to_dict() for result in metrics_runs]).mean(
+        numeric_only=True
+    )
+    return (
+        MetricsResult(
+            technique=metrics_runs[0].technique,
+            missing_pct=missing_pct,
+            mae=float(means["mae"]),
+            rmse=float(means["rmse"]),
+            relative_error=float(means["relative_error"]),
+            mape=float(means["mape"]),
+            execution_time_seconds=float(means["execution_time_seconds"]),
+            n_points=metrics_runs[0].n_points,
+            n_runs=len(metrics_runs),
+        ),
+        first_outcome,
+        first_removed_indices,
+    )
+
+
 @dataclass
 class ExperimentRunner:
     """Runs the end-to-end imputation benchmark for one dataset/column.
@@ -104,7 +181,8 @@ class ExperimentRunner:
     imputers:
         List of imputer instances to benchmark (defaults to all seven).
     random_state:
-        Seed used for reproducible MCAR deletion.
+        Seed used for reproducible MCAR deletion. Eight independent runs per
+        technique and scenario use incrementing seeds from this value.
     """
 
     data_path: Path
@@ -134,20 +212,18 @@ class ExperimentRunner:
         Returns
         -------
         pandas.DataFrame
-            Long-form results table (one row per technique x missing_pct),
-            also written to ``results_dir / 'results.csv'``.
+            Averaged results table (one row per technique x missing_pct,
+            including successful repetition count), also written to
+            ``results_dir / 'results.csv'``.
         """
         self._loader.load()
         ground_truth = self._loader.select_column(self.target_column)
 
         all_results: list[MetricsResult] = []
-        example_run: dict | None = None
 
         for missing_pct in self.missing_rates:
             try:
-                series_with_missing, truth, removed_indices = self._generator.generate(
-                    ground_truth, missing_pct
-                )
+                self._generator.generate(ground_truth, missing_pct)
             except InvalidMissingRateError as exc:
                 logger.warning(
                     "Skipping %.0f%% missingness because it cannot be generated: %s",
@@ -158,7 +234,12 @@ class ExperimentRunner:
 
             for imputer in self.imputers:
                 try:
-                    outcome = imputer.impute(series_with_missing)
+                    metrics_result, outcome, removed_indices = run_repeated_imputation(
+                        imputer=imputer,
+                        ground_truth=ground_truth,
+                        missing_pct=missing_pct,
+                        random_state=self.random_state,
+                    )
                 except ImputationError as exc:
                     logger.error(
                         "Skipping %s at %.0f%% missing due to error: %s",
@@ -168,19 +249,11 @@ class ExperimentRunner:
                     )
                     continue
 
-                metrics_result = MetricsCalculator.evaluate(
-                    technique=outcome.technique_name,
-                    missing_pct=missing_pct,
-                    imputed_series=outcome.imputed_series,
-                    ground_truth=truth,
-                    removed_indices=removed_indices,
-                    execution_time_seconds=outcome.execution_time_seconds,
-                )
                 all_results.append(metrics_result)
 
-                if generate_plots and (example_run is None or missing_pct == self.missing_rates[0]):
+                if generate_plots and missing_pct == self.missing_rates[0]:
                     self._visualizer.plot_original_vs_imputed(
-                        ground_truth=truth,
+                        ground_truth=ground_truth,
                         imputed_series=outcome.imputed_series,
                         removed_indices=removed_indices,
                         technique=outcome.technique_name,
