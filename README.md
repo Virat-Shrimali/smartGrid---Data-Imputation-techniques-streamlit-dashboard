@@ -31,8 +31,8 @@ and transmission glitches. This package:
 
 - Loads any CSV time-series dataset and lets you select a numeric column.
 - Generates MCAR (Missing Completely At Random) missing values at any whole
-  percentage from 1% to 99%; full experiments include the paper's 1%, 3%, 5%,
-  10%, and 20% rates plus the 99% stress test.
+  percentage from 1% to 99%; full experiments use 1%, 3%, and 5%, then 10-point
+  increments from 10% through 90%, followed by the 99% stress test.
 - Runs seven imputation algorithms — Median, LOCF, KNN, Makima, PCHIP, MICE,
   and MissForest — each inheriting a common abstract base class.
 - Computes MAE, RMSE, Relative Error, MAPE, and execution time for every run.
@@ -84,9 +84,8 @@ Then, in the browser:
 python main.py --data data/example_smart_grid.csv --column primary_current_a
 ```
 
-This runs the full experiment pipeline (all seven techniques × six missing
-rates, including the 99% stress test), writes `results/results.csv`, and saves
-all figures to `figures/`.
+This runs the full experiment pipeline (all seven techniques × 13 missing
+rates), writes `results/results.csv`, and saves all figures to `figures/`.
 
 ### Running tests
 

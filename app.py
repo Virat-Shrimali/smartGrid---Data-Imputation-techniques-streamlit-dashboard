@@ -478,9 +478,9 @@ def render_results() -> None:
 
     st.markdown("### One-Click Full Experiment")
     st.write(
-        "Runs **all seven algorithms** across the standard missing-data scenarios "
-        "(1%, 3%, 5%, 10%, 20%) plus the 99% stress test on the selected target "
-        "column, and saves "
+        "Runs **all seven algorithms** at 1%, 3%, and 5%, then in 10-point "
+        "increments from 10% through 90%, plus the 99% stress test on the selected "
+        "target column, and saves "
         "`results/results.csv` plus all standard figures to `figures/`."
     )
     if st.session_state.target_column is None:

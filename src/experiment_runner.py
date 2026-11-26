@@ -99,7 +99,8 @@ class ExperimentRunner:
     figures_dir:
         Directory where plots will be saved.
     missing_rates:
-        Missing-data fractions to evaluate (default: 1/3/5/10/20/99%).
+        Missing-data fractions to evaluate (default: 1/3/5%, then 10-point
+        increments from 10% through 90%, followed by 99%).
     imputers:
         List of imputer instances to benchmark (defaults to all seven).
     random_state:
