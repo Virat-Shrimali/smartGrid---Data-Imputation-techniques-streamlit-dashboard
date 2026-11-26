@@ -24,6 +24,16 @@ def test_generate_removes_correct_count(clean_series):
     assert ground_truth.isna().sum() == 0  # ground truth untouched
 
 
+def test_generate_supports_99_percent_missingness(clean_series):
+    gen = MissingGenerator(random_state=1)
+    with_missing, ground_truth, removed = gen.generate(clean_series, 0.99)
+
+    assert len(removed) == 495
+    assert with_missing.isna().sum() == 495
+    assert with_missing.notna().sum() == 5
+    pd.testing.assert_series_equal(ground_truth, clean_series)
+
+
 def test_generate_is_reproducible(clean_series):
     gen1 = MissingGenerator(random_state=42)
     gen2 = MissingGenerator(random_state=42)

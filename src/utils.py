@@ -102,5 +102,5 @@ def ensure_directory(path: Path) -> Path:
     return path
 
 
-# Standard missing-rate scenarios used throughout the package/paper.
-DEFAULT_MISSING_RATES: tuple[float, ...] = (0.01, 0.03, 0.05, 0.10, 0.20)
+# Standard paper scenarios plus the 99% extreme Makima stress test.
+DEFAULT_MISSING_RATES: tuple[float, ...] = (0.01, 0.03, 0.05, 0.10, 0.20, 0.99)

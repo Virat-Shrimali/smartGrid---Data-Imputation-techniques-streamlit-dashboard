@@ -29,7 +29,7 @@ from src.plotly_visuals import (
     plot_original_vs_imputed,
     plot_runtime_comparison,
 )
-from src.utils import SmartGridImputationError, ensure_directory
+from src.utils import DEFAULT_MISSING_RATES, SmartGridImputationError, ensure_directory
 
 # --------------------------------------------------------------------------- #
 # Page configuration & styling
@@ -188,7 +188,7 @@ def render_home() -> None:
         """
         <div class="sg-hero">
             <h1>⚡ SmartGrid-Imputation</h1>
-            <p>An interactive research dashboard comparing four data imputation techniques
+            <p>An interactive research dashboard for experimenting with data imputation
             for missing values in Smart Grid electrical time-series data.</p>
         </div>
         """,
@@ -205,15 +205,15 @@ def render_home() -> None:
             "the implementation of **Schreiber et al. (IEEE Access, 2023)**, which "
             "compares four imputation techniques on real underground-substation data "
             "from the CEEE utility (Porto Alegre, Brazil), and validates **Makima** "
-            "interpolation as the most robust technique across missing rates from 1% "
-            "up to 99%."
+            "interpolation as the most robust technique in the paper's 99% stress test. "
+            "This dashboard lets you test uploaded datasets from 1% to 99% missingness."
         )
 
         st.markdown("### Research Objectives")
         st.markdown(
             """
             - Reproduce Median, LOCF, KNN, and Makima imputation as production-quality code.
-            - Benchmark each technique across realistic MCAR missing-data rates (1%–20%).
+            - Benchmark each technique across standard MCAR rates and a 99% stress test.
             - Quantify accuracy (MAE, RMSE, Relative Error, MAPE) and runtime.
             - Provide an interactive tool to upload any CSV time series and repeat the study.
             """
@@ -235,7 +235,7 @@ def render_home() -> None:
         st.markdown("### Workflow")
         steps = [
             "📂 Load & inspect a CSV time series",
-            "⚡ Generate MCAR missing values (1–20%)",
+            "⚡ Generate MCAR missing values (1–99%)",
             "🧠 Run one or more imputation algorithms",
             "📊 Compare MAE / RMSE / Relative Error / MAPE",
             "📈 Explore interactive visualizations",
@@ -342,10 +342,13 @@ def render_missing_data() -> None:
 
     st.write("Mechanism: **MCAR** (Missing Completely At Random) — matches the methodology used in the paper.")
 
-    missing_pct_display = st.select_slider(
+    missing_pct_display = st.slider(
         "Missing data percentage",
-        options=[1, 3, 5, 10, 20],
-        value=int(st.session_state.missing_pct * 100) if st.session_state.missing_pct * 100 in [1, 3, 5, 10, 20] else 5,
+        min_value=1,
+        max_value=99,
+        value=min(99, max(1, int(st.session_state.missing_pct * 100))),
+        step=1,
+        format="%d%%",
     )
     missing_pct = missing_pct_display / 100
 
@@ -475,8 +478,9 @@ def render_results() -> None:
 
     st.markdown("### One-Click Full Experiment")
     st.write(
-        "Runs **all four algorithms** across the standard missing-data scenarios "
-        "(1%, 3%, 5%, 10%, 20%) on the currently selected target column, and saves "
+        "Runs **all seven algorithms** across the standard missing-data scenarios "
+        "(1%, 3%, 5%, 10%, 20%) plus the 99% stress test on the selected target "
+        "column, and saves "
         "`results/results.csv` plus all standard figures to `figures/`."
     )
     if st.session_state.target_column is None:
@@ -497,7 +501,16 @@ def render_results() -> None:
             )
             full_results_df = runner.run(generate_plots=True)
         st.session_state.results_df = full_results_df
-        st.success(f"Full experiment complete — {len(full_results_df)} technique×scenario combinations evaluated.")
+        expected_combinations = len(IMPUTER_REGISTRY) * len(DEFAULT_MISSING_RATES)
+        st.success(
+            f"Full experiment complete — {len(full_results_df)} successful "
+            "technique×scenario combinations evaluated."
+        )
+        if len(full_results_df) < expected_combinations:
+            st.warning(
+                "Some combinations were skipped because the dataset was too small for "
+                "a missingness rate or an algorithm could not complete the imputation."
+            )
 
     st.divider()
     results_df = st.session_state.results_df
