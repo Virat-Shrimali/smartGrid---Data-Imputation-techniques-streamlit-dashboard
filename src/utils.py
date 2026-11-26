@@ -102,5 +102,19 @@ def ensure_directory(path: Path) -> Path:
     return path
 
 
-# Standard missing-rate scenarios used throughout the package/paper.
-DEFAULT_MISSING_RATES: tuple[float, ...] = (0.01, 0.03, 0.05, 0.10, 0.20)
+# Paper baseline scenarios plus 10-point stress increments through 90%, then 99%.
+DEFAULT_MISSING_RATES: tuple[float, ...] = (
+    0.01,
+    0.03,
+    0.05,
+    0.10,
+    0.20,
+    0.30,
+    0.40,
+    0.50,
+    0.60,
+    0.70,
+    0.80,
+    0.90,
+    0.99,
+)

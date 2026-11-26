@@ -1,8 +1,9 @@
 """Synthetic MCAR (Missing Completely At Random) missing-value generation.
 
 Provides :class:`MissingGenerator`, which randomly removes a specified
-percentage of values from a numeric series, mirroring the methodology
-used in the reference paper (random deletion at 1%, 3%, 5%, 10%, 20%).
+percentage of values from a numeric series, mirroring the reference paper's
+1%, 3%, and 5% baseline rates and its 10-point stress increments through 90%,
+followed by the 99% Makima stress test.
 """
 
 from __future__ import annotations

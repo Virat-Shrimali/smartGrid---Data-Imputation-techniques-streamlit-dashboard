@@ -9,7 +9,7 @@ implementation section of:
 
 The paper compares four imputation techniques for missing values in Smart Grid
 electrical time-series data — **Median**, **LOCF**, **KNN**, and **Makima** — and
-validates Makima as the most robust technique, tolerating up to 99% missing data.
+reports Makima as the most robust technique in its 99%-missing stress test.
 
 This project reproduces those four techniques as a modular, tested Python package
 (`src/`) and exposes them through a polished, multi-page Streamlit dashboard
@@ -30,8 +30,9 @@ temperature) that are frequently corrupted by sensor faults, network errors,
 and transmission glitches. This package:
 
 - Loads any CSV time-series dataset and lets you select a numeric column.
-- Generates MCAR (Missing Completely At Random) missing values at 1%, 3%, 5%,
-  10%, and 20% rates.
+- Generates MCAR (Missing Completely At Random) missing values at any whole
+  percentage from 1% to 99%; full experiments use 1%, 3%, and 5%, then 10-point
+  increments from 10% through 90%, followed by the 99% stress test.
 - Runs seven imputation algorithms — Median, LOCF, KNN, Makima, PCHIP, MICE,
   and MissForest — each inheriting a common abstract base class.
 - Computes MAE, RMSE, Relative Error, MAPE, and execution time for every run.
@@ -70,8 +71,8 @@ Then, in the browser:
    MCAR gaps.
 3. **🧠 Imputation Algorithms** — select and run one or more algorithms.
 4. **📊 Experiment Results** — view the comparison table, or click
-   **🚀 Run All Experiments** to benchmark all four techniques across every
-   scenario (1–20% missing) in one click.
+   **🚀 Run All Experiments** to benchmark all seven techniques across the
+   standard scenarios plus the 99% stress test in one click.
 5. **📈 Visualizations** — explore original-vs-imputed signals, error curves,
    runtime, and metric comparisons; export figures as a ZIP.
 6. **📑 Literature Summary** / **ℹ️ About** — background on the source paper and
@@ -83,7 +84,7 @@ Then, in the browser:
 python main.py --data data/example_smart_grid.csv --column primary_current_a
 ```
 
-This runs the full experiment pipeline (all four techniques × five missing
+This runs the full experiment pipeline (all seven techniques × 13 missing
 rates), writes `results/results.csv`, and saves all figures to `figures/`.
 
 ### Running tests

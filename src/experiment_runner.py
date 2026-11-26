@@ -1,7 +1,7 @@
 """Orchestration of the full imputation experiment pipeline.
 
 :class:`ExperimentRunner` ties together data loading, missing-value
-generation, all four imputation algorithms, metric computation, and
+generation, all supported imputation algorithms, metric computation, and
 result persistence into a single reproducible workflow.
 """
 
@@ -23,7 +23,13 @@ from src.missforest_imputer import MissForestImputer
 from src.metrics import MetricsCalculator, MetricsResult
 from src.missing_generator import MissingGenerator
 from src.pchip_imputer import PCHIPImputer
-from src.utils import DEFAULT_MISSING_RATES, ImputationError, ensure_directory, get_logger
+from src.utils import (
+    DEFAULT_MISSING_RATES,
+    ImputationError,
+    InvalidMissingRateError,
+    ensure_directory,
+    get_logger,
+)
 from src.visualizer import Visualizer
 
 logger = get_logger(__name__)
@@ -93,9 +99,10 @@ class ExperimentRunner:
     figures_dir:
         Directory where plots will be saved.
     missing_rates:
-        Missing-data fractions to evaluate (default: 1/3/5/10/20%).
+        Missing-data fractions to evaluate (default: 1/3/5%, then 10-point
+        increments from 10% through 90%, followed by 99%).
     imputers:
-        List of imputer instances to benchmark (defaults to all four).
+        List of imputer instances to benchmark (defaults to all seven).
     random_state:
         Seed used for reproducible MCAR deletion.
     """
@@ -137,9 +144,17 @@ class ExperimentRunner:
         example_run: dict | None = None
 
         for missing_pct in self.missing_rates:
-            series_with_missing, truth, removed_indices = self._generator.generate(
-                ground_truth, missing_pct
-            )
+            try:
+                series_with_missing, truth, removed_indices = self._generator.generate(
+                    ground_truth, missing_pct
+                )
+            except InvalidMissingRateError as exc:
+                logger.warning(
+                    "Skipping %.0f%% missingness because it cannot be generated: %s",
+                    missing_pct * 100,
+                    exc,
+                )
+                continue
 
             for imputer in self.imputers:
                 try:

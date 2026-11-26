@@ -10,6 +10,7 @@ from src.knn_imputer import KNNImputer
 from src.locf_imputer import LOCFImputer
 from src.makima_imputer import MakimaImputer
 from src.median_imputer import MedianImputer
+from src.missing_generator import MissingGenerator
 from src.utils import ImputationError
 
 
@@ -87,6 +88,20 @@ def test_makima_interpolates_smooth_trend():
     true_vals = np.sin(np.array([10, 11, 12]) / 5.0)
     imputed_vals = result.imputed_series.iloc[[10, 11, 12]].to_numpy()
     np.testing.assert_allclose(imputed_vals, true_vals, atol=0.1)
+
+
+def test_makima_completes_99_percent_missingness():
+    original = pd.Series(np.sin(np.arange(500) / 30.0))
+    with_missing, _, removed = MissingGenerator(random_state=1).generate(original, 0.99)
+
+    result = MakimaImputer().impute(with_missing)
+
+    assert len(removed) == 495
+    assert result.imputed_series.notna().all()
+    pd.testing.assert_series_equal(
+        result.imputed_series[with_missing.notna()],
+        original[with_missing.notna()],
+    )
 
 
 def test_empty_series_raises_for_all_imputers():
